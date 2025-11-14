@@ -56,7 +56,10 @@ class MultiTenantAutoConfiguration {
     }
     
     @Bean
-    fun multiTenantConnectionProvider(dataSource: DataSource): MultiTenantConnectionProvider<String> {
-        return SchemaBasedMultiTenantConnectionProvider(dataSource)
+    fun multiTenantConnectionProvider(
+        dataSource: DataSource,
+        flywayTenantMigration: FlywayTenantMigration
+    ): MultiTenantConnectionProvider<String> {
+        return SchemaBasedMultiTenantConnectionProvider(dataSource, flywayTenantMigration)
     }
 }

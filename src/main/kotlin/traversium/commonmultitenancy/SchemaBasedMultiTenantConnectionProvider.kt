@@ -7,7 +7,8 @@ import java.sql.Connection
 import javax.sql.DataSource
 
 class SchemaBasedMultiTenantConnectionProvider(
-    private val dataSource: DataSource
+    private val dataSource: DataSource,
+    private val flywayTenantMigration: FlywayTenantMigration
 ) : AbstractMultiTenantConnectionProvider<String>() {
 
     private val logger = LoggerFactory.getLogger(SchemaBasedMultiTenantConnectionProvider::class.java)
@@ -27,21 +28,31 @@ class SchemaBasedMultiTenantConnectionProvider(
     ) : ConnectionProvider {
 
         override fun getConnection(): Connection {
-            val connection = dataSource.connection
-            val schemaName = if (tenantIdentifier == "public") {
-                "public"
-            } else {
-                val sanitizedTenantId = TenantUtils.sanitizeTenantIdForSchema(tenantIdentifier)
-                "tenant_$sanitizedTenantId"
+            val rawConnection = dataSource.connection
+
+            val schemaName = when (tenantIdentifier) {
+                "public" -> "public"
+                else -> "tenant_${TenantUtils.sanitizeTenantIdForSchema(tenantIdentifier)}"
             }
 
             logger.info("Getting connection for tenant '$tenantIdentifier', setting schema to: '$schemaName'")
 
-            connection.createStatement().use { stmt ->
-                stmt.execute("SET search_path TO $schemaName")
+            if (schemaName != "public") {
+                if (!schemaExists(rawConnection, schemaName)) {
+                    logger.info("Schema '$schemaName' does not exist, running Flyway migration for it.")
+
+                    rawConnection.close()
+
+                    flywayTenantMigration.migrateTenant(tenantIdentifier)
+
+                    return dataSource.connection.also { conn ->
+                        setSearchPath(conn, schemaName)
+                    }
+                }
             }
 
-            return connection
+            setSearchPath(rawConnection, schemaName)
+            return rawConnection
         }
 
         override fun closeConnection(connection: Connection) {
@@ -67,6 +78,28 @@ class SchemaBasedMultiTenantConnectionProvider(
 
         override fun isUnwrappableAs(unwrapType: Class<*>): Boolean {
             return DataSource::class.java.isAssignableFrom(unwrapType)
+        }
+    }
+
+    private fun schemaExists(connection: Connection, schemaName: String): Boolean {
+        val sql = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.schemata
+            WHERE schema_name = ?
+        )
+    """
+        return connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, schemaName)
+            stmt.executeQuery().use { resultSet ->
+                resultSet.next() && resultSet.getBoolean(1)
+            }
+        }
+    }
+
+    private fun setSearchPath(connection: Connection, schema: String) {
+        connection.createStatement().use { stmt ->
+            stmt.execute("SET search_path TO $schema")
         }
     }
 }
