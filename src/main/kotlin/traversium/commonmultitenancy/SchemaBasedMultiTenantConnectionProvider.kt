@@ -19,7 +19,6 @@ class SchemaBasedMultiTenantConnectionProvider(
 
     override fun selectConnectionProvider(tenantIdentifier: String?): ConnectionProvider {
         val tenant = tenantIdentifier ?: "public"
-        logger.info("Selecting connection provider for tenant: '$tenant'")
         return TenantConnectionProvider(tenant)
     }
 
@@ -34,8 +33,6 @@ class SchemaBasedMultiTenantConnectionProvider(
                 "public" -> "public"
                 else -> "tenant_${TenantUtils.sanitizeTenantIdForSchema(tenantIdentifier)}"
             }
-
-            logger.info("Getting connection for tenant '$tenantIdentifier', setting schema to: '$schemaName'")
 
             if (schemaName != "public") {
                 if (!schemaExists(rawConnection, schemaName)) {
