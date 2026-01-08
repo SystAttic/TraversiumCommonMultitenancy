@@ -35,16 +35,20 @@ class SchemaBasedMultiTenantConnectionProvider(
             }
 
             if (schemaName != "public") {
-                if (!schemaExists(rawConnection, schemaName)) {
+                val schemaAlreadyExists = schemaExists(rawConnection, schemaName)
+
+                if (!schemaAlreadyExists) {
                     logger.info("Schema '$schemaName' does not exist, running Flyway migration for it.")
+                } else {
+                    logger.debug("Schema '$schemaName' exists, checking for pending migrations.")
+                }
 
-                    rawConnection.close()
+                rawConnection.close()
 
-                    flywayTenantMigration.migrateTenant(tenantIdentifier)
+                flywayTenantMigration.migrateTenant(tenantIdentifier)
 
-                    return dataSource.connection.also { conn ->
-                        setSearchPath(conn, schemaName)
-                    }
+                return dataSource.connection.also { conn ->
+                    setSearchPath(conn, schemaName)
                 }
             }
 
