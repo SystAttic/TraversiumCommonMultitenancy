@@ -10,7 +10,7 @@
     </parent>
     <groupId>traversium</groupId>
     <artifactId>common-multitenancy</artifactId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.3.0</version>
     <name>common-multitenancy</name>
     <description>common-multitenancy</description>
     <url/>
